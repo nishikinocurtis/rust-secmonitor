@@ -134,7 +134,7 @@ pub(crate) fn dump_result() -> Result<(), std::io::Error>{
 pub (crate) fn report_result(master_server: &str) -> Result<(), Box<dyn Error>>{
     let client = reqwest::blocking::Client::new();
 
-    let stats = match File::open("secmonitor-stats.json") {
+    /*let stats = match File::open("secmonitor-stats.json") {
         Ok(file) => file,
         Err(_) => {
             let mut new_file = File::create("secmonitor-stats.json")?;
@@ -142,10 +142,12 @@ pub (crate) fn report_result(master_server: &str) -> Result<(), Box<dyn Error>>{
 
             new_file
         }
-    };
+    };*/
+    let mut report_body = HashMap::<String, HashMap<u32, u64>>::new();
+    report_body.insert("data".to_string(), SYSCALL_COUNTER.lock().unwrap().clone());
 
     let resp = client.post(master_server)
-        .body(stats)
+        .json(&report_body)
         .send()?
         .text()?;
 
