@@ -5,9 +5,28 @@ use ctrlc;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::runtime::Runtime;
+use std::env;
+use clap::Parser;
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    /// Name of docker image to run
+    #[clap(short, long, value_parser)]
+    name: String,
+
+    /// Optional master server to report local stats
+    #[clap(short, long, value_parser)]
+    server: Option<String>,
+
+    /// Displaying debugging information
+    #[clap(short, long, action = clap::ArgAction::Count)]
+    debug: u8,
+}
 
 fn main() {
-    println!("Hello, world!");
+    // println!("Hello, world!");
+    let cli = Cli::parse();
 
     let runnable = Arc::new(AtomicBool::new(true));
     let r = runnable.clone();
@@ -30,7 +49,7 @@ fn main() {
 
     let mut proc_list = Vec::<u32>::new();
 
-    match runtime.block_on(docker::create_and_run_container("nginx")) {
+    match runtime.block_on(docker::create_and_run_container(&cli.name)) {
         Err(e) => {
             eprintln!("Error: {}", e);
             std::process::exit(1);
@@ -67,4 +86,15 @@ fn main() {
         },
         _ => {}
     }
+
+    if let Some(server) = cli.server.as_deref() {
+        match monitor::report_result(server) {
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                std::process::exit(1);
+            },
+            _ => {}
+        }
+    }
 }
+

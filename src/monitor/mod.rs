@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Display;
 use std::fs::File;
+use std::io::Read;
 //use bcc::ring_buf::{RingBufBuilder, RingCallback};
 use bcc::perf_event::{PerfMapBuilder};
 use bcc::RawTracepoint;
@@ -12,6 +13,7 @@ use bcc::BccError;
 use bcc::BPF;
 use clap::{App, Arg};
 use lazy_static::lazy_static;
+use reqwest::Response;
 use serde_json;
 
 
@@ -126,6 +128,29 @@ pub(crate) fn dump_result() -> Result<(), std::io::Error>{
     let file = File::create("secmonitor-stats.json")?;
     serde_json::to_writer(file, &SYSCALL_COUNTER.lock().unwrap().clone())?;
     
+    Ok(())
+}
+
+pub (crate) fn report_result(master_server: &str) -> Result<(), Box<dyn Error>>{
+    let client = reqwest::blocking::Client::new();
+
+    let stats = match File::open("secmonitor-stats.json") {
+        Ok(file) => file,
+        Err(_) => {
+            let mut new_file = File::create("secmonitor-stats.json")?;
+            serde_json::to_writer(new_file.by_ref(), &SYSCALL_COUNTER.lock().unwrap().clone())?;
+
+            new_file
+        }
+    };
+
+    let resp = client.post(master_server)
+        .body(stats)
+        .send()?
+        .text()?;
+
+    println!("Reported local stats. Getting response {:#?}", resp);
+
     Ok(())
 }
 
